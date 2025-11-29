@@ -9,8 +9,90 @@ class AdminPanelController extends BaseController
 {
     public function index()
     {
-        //
-        return view('admin/dashboard');
+        $database = \Config\Database::connect();
+        
+        // Get total users count
+        $totalUsers = $database->table('admins')->countAllResults();
+        
+        // Get active users count
+        $activeUsers = $database->table('admins')->where('status', 1)->countAllResults();
+        
+        // Get yoga trainer/instructor users (role 4)
+        $yogaTrainers = $database->table('admins')->where('role', 4)->countAllResults();
+        
+        // Get trainers with incomplete data (yoga trainers without trainer_studio entry)
+        // First get all user_ids that have trainer data
+        $trainerUserIds = $database->table('trainers_and_studio')
+            ->select('user_id')
+            ->get()
+            ->getResultArray();
+        $trainerUserIdsArray = array_column($trainerUserIds, 'user_id');
+        
+        // Get yoga trainers without trainer data
+        $incompleteTrainersQuery = $database->table('admins')
+            ->where('role', 4);
+        
+        if(!empty($trainerUserIdsArray)) {
+            $incompleteTrainersQuery->whereNotIn('id', $trainerUserIdsArray);
+        }
+        
+        $incompleteTrainers = $incompleteTrainersQuery->get()->getResultArray();
+        
+        // Get total trainers and studio count
+        $totalTrainersStudio = $database->table('trainers_and_studio')->countAllResults();
+        
+        // Get active trainers and studio count
+        $activeTrainersStudio = $database->table('trainers_and_studio')->where('status', 1)->countAllResults();
+        
+        // Get total members count
+        $totalMembers = $database->table('members')->countAllResults();
+        
+        // Get total services count
+        $totalServices = $database->table('services')->countAllResults();
+        
+        // Get total posts count
+        $totalPosts = $database->table('posts')->countAllResults();
+        
+        // Get total events count
+        $totalEvents = $database->table('events')->countAllResults();
+        
+        // Get total gallery images count
+        $totalGallery = $database->table('gallery')->countAllResults();
+        
+        // Get recent users (last 10) with date
+        $recentUsers = $database->table('admins')
+            ->select('admins.*, COALESCE(admins.created_at, NULL) as created_date')
+            ->orderBy('id', 'DESC')
+            ->limit(10)
+            ->get()
+            ->getResultArray();
+        
+        // Get recent trainers (last 5) with date
+        $recentTrainers = $database->table('trainers_and_studio')
+            ->select('trainers_and_studio.*, admins.name as user_name, admins.email as user_email, COALESCE(trainers_and_studio.created_at, trainers_and_studio.created_date, trainers_and_studio.updated_date, NULL) as created_date')
+            ->join('admins', 'admins.id = trainers_and_studio.user_id')
+            ->orderBy('trainers_and_studio.id', 'DESC')
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+        
+        $data = [
+            'totalUsers' => $totalUsers,
+            'activeUsers' => $activeUsers,
+            'yogaTrainers' => $yogaTrainers,
+            'incompleteTrainers' => $incompleteTrainers,
+            'totalTrainersStudio' => $totalTrainersStudio,
+            'activeTrainersStudio' => $activeTrainersStudio,
+            'totalMembers' => $totalMembers,
+            'totalServices' => $totalServices,
+            'totalPosts' => $totalPosts,
+            'totalEvents' => $totalEvents,
+            'totalGallery' => $totalGallery,
+            'recentUsers' => $recentUsers,
+            'recentTrainers' => $recentTrainers
+        ];
+        
+        return view('admin/dashboard', $data);
     }
 
     public function logout() {
@@ -220,11 +302,116 @@ class AdminPanelController extends BaseController
 
     public function user_list(){
         $database = \Config\Database::connect();
+        
+        // Get filter parameters - support multiple roles
+        $roles = $this->request->getVar('roles'); // Can be array or single value
+        $status = $this->request->getVar('status');
+        $trainer_studio_status = $this->request->getVar('trainer_studio_status');
+        
         $db = $database->table('admins');
+        
+        // Normalize roles - support multiple roles
+        $normalizedRoles = [];
+        if($roles) {
+            // Convert to array if it's a single value
+            if(!is_array($roles)) {
+                $roles = [$roles];
+            }
+            // Remove empty values and normalize
+            foreach($roles as $r) {
+                if($r !== null && $r !== '') {
+                    $normalizedRoles[] = (string)$r;
+                }
+            }
+        }
+        
+        // Apply role filters - support multiple roles
+        if(!empty($normalizedRoles)) {
+            $db->whereIn('role', $normalizedRoles);
+        }
+        
+        // Apply status filter
+        if($status !== null && $status !== '') {
+            $db->where('status', $status);
+        }
+        
+        // Filter by trainer studio status
+        if($trainer_studio_status) {
+            try {
+                // Get all user_ids that have trainer/studio data
+                $trainerQuery = $database->table('trainers_and_studio')
+                    ->select('user_id, status as trainer_status');
+                
+                if($trainer_studio_status == 'active') {
+                    $trainerQuery->where('status', 1);
+                } elseif($trainer_studio_status == 'inactive') {
+                    $trainerQuery->where('status', 0);
+                }
+                
+                $trainerData = $trainerQuery->get()->getResultArray();
+                $trainerUserIdsArray = array_column($trainerData, 'user_id');
+                
+                if($trainer_studio_status == 'has_profile' || $trainer_studio_status == 'active' || $trainer_studio_status == 'inactive') {
+                    // Show users who have trainer/studio profiles
+                    if(!empty($trainerUserIdsArray)) {
+                        $db->whereIn('id', $trainerUserIdsArray);
+                    } else {
+                        // No users with trainer profiles, return empty result
+                        $db->where('1', '0'); // Force no results
+                    }
+                } elseif($trainer_studio_status == 'no_profile') {
+                    // Show users who don't have trainer/studio profiles
+                    if(!empty($trainerUserIdsArray)) {
+                        $db->whereNotIn('id', $trainerUserIdsArray);
+                    }
+                    // If trainerUserIdsArray is empty, all users don't have profiles
+                }
+            } catch(\Exception $e) {
+                // Log error but don't break the page
+                log_message('error', 'Error in trainer studio status filter: ' . $e->getMessage());
+            }
+        }
+        
         $db->orderBy('id', 'desc');
-        $data['users'] = $db->get()->getResultArray();
-       // echo json_encode(['data' => $city]);
-         return view('admin/user-list', $data);
+        $users = $db->get()->getResultArray();
+        
+        // Check which users have trainer/studio data and get their status
+        foreach($users as &$user) {
+            // Ensure all required fields exist
+            if(!isset($user['id'])) $user['id'] = '';
+            if(!isset($user['name'])) $user['name'] = '';
+            if(!isset($user['email'])) $user['email'] = '';
+            if(!isset($user['username'])) $user['username'] = '';
+            if(!isset($user['phone_no'])) $user['phone_no'] = '';
+            if(!isset($user['role'])) $user['role'] = '';
+            if(!isset($user['status'])) $user['status'] = 0;
+            
+            // Check if user has trainer/studio profile
+            $trainerData = $database->table('trainers_and_studio')
+                ->where('user_id', $user['id'])
+                ->get()
+                ->getRowArray();
+            
+            $user['has_trainer_data'] = !empty($trainerData);
+            $user['trainer_data'] = $trainerData ? $trainerData : [];
+            $user['trainer_status'] = $trainerData ? ($trainerData['status'] ?? null) : null;
+        }
+        
+        // Prepare role filter for view
+        $selectedRoles = $roles;
+        if(!is_array($selectedRoles) && $selectedRoles) {
+            $selectedRoles = [$selectedRoles];
+        }
+        if(empty($selectedRoles)) {
+            $selectedRoles = [];
+        }
+        
+        $data['users'] = $users;
+        $data['role_filter'] = $selectedRoles; // Now an array
+        $data['status_filter'] = $status;
+        $data['trainer_studio_status_filter'] = $trainer_studio_status;
+        
+        return view('admin/user-list', $data);
     }
     public function update_user_status(){
          $status = $this->request->getVar('status');

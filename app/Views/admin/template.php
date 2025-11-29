@@ -85,9 +85,17 @@
                with font-awesome or any other icon font library -->
 
           <li class="nav-item">
+            <a href="<?= base_url('admin/dashboard')?>" class="nav-link">
+              <i class="nav-icon fas fa-tachometer-alt"></i>
+              <p>
+                Dashboard
+              </p>
+            </a>
+          </li>
+
+          <li class="nav-item">
               <a href="#" class="nav-link">
-                <!-- <i class="nav-icon fa fa-calendar"></i> -->
-                <span style="font-size: 20px !important"> </span>
+                <i class="nav-icon fas fa-images"></i>
                 <p>
                   
                   Slider
@@ -114,7 +122,7 @@
           
             <li class="nav-item">
             <a href="<?php echo base_url('admin/config');?>" class="nav-link">
-              <!--<i class="nav-icon fas fa-cog"></i>-->
+              <i class="nav-icon fas fa-cog"></i>
               <p>
                 Settings & About us
                 
@@ -124,8 +132,7 @@
 
           <li class="nav-item">
               <a href="#" class="nav-link">
-                <!-- <i class="nav-icon fa fa-calendar"></i> -->
-                <span style="font-size: 20px !important"> </span>
+                <i class="nav-icon fas fa-concierge-bell"></i>
                 <p>
                   
                   Services
@@ -150,8 +157,7 @@
           </li>
             <li class="nav-item">
               <a href="#" class="nav-link">
-                <!-- <i class="nav-icon fa fa-calendar"></i> -->
-                <span style="font-size: 20px !important"> </span>
+                <i class="nav-icon fas fa-newspaper"></i>
                 <p>
                   
                   Posts
@@ -203,7 +209,7 @@
 
                <li class="nav-item">
               <a href="#" class="nav-link">
-              <!--  <span style="font-size: 20px !important"><strong>TT </strong></span> -->
+                <i class="nav-icon fas fa-users"></i>
                 <p>
                   
                   Team
@@ -229,7 +235,7 @@
     
                <li class="nav-item">
 	            <a href="#" class="nav-link">
-	            <!--  <span style="font-size: 20px !important"><strong>TT </strong></span> -->
+	            <i class="nav-icon fas fa-quote-left"></i>
 	              <p>
 	              	
 	                Testimonials
@@ -266,7 +272,7 @@
       
           <li class="nav-item">
             <a href="<?php echo base_url('admin/privacy-policy');?>" class="nav-link">
-              
+              <i class="nav-icon fas fa-shield-alt"></i>
               <p>
                Privacy Policy
                 
@@ -275,7 +281,7 @@
           </li>
            <li class="nav-item">
             <a href="<?php echo base_url('admin/term-conditions');?>" class="nav-link">
-             
+             <i class="nav-icon fas fa-file-contract"></i>
               <p>
                Term And condtions
                 
@@ -285,7 +291,7 @@
       
           <li class="nav-item">
               <a href="#" class="nav-link">
-               <!--<i class="nav-icon far fa-image"></i>-->
+               <i class="nav-icon far fa-image"></i>
                 <p>
                   
                   Gallery
@@ -311,7 +317,7 @@
          
           <li class="nav-item">
             <a href="<?= base_url('admin/trainers-and-studio');?>" class="nav-link">
-             
+             <i class="nav-icon fas fa-user-tie"></i>
               <p>
                 Trainers and studio
               </p>
@@ -319,7 +325,7 @@
           </li>
            <li class="nav-item">
             <a href="<?= base_url('admin/user-list');?>" class="nav-link">
-             
+             <i class="nav-icon fas fa-user-friends"></i>
               <p>
                 User List
               </p>
@@ -328,7 +334,7 @@
 
            <li class="nav-item">
 	            <a href="#" class="nav-link">
-	             
+	             <i class="nav-icon fas fa-user-check"></i>
 	              <p>
 	              	
 	                Client
@@ -440,6 +446,57 @@
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.9.0/moment.min.js"></script>
 <script type="text/javascript" src="<?php echo base_url('assets')?>/plugins/summernote/summernote-bs4.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap4-datetimepicker@5.2.3/build/js/bootstrap-datetimepicker.min.js"></script>
+ 
+ <script>
+ // Sidebar Active Link Functionality
+ $(document).ready(function() {
+     // Get current URL path
+     var currentPath = window.location.pathname;
+     
+     // Remove base URL if present
+     var baseUrl = '<?= base_url() ?>';
+     if (currentPath.indexOf(baseUrl) === 0) {
+         currentPath = currentPath.substring(baseUrl.length);
+     }
+     
+     // Remove leading slash
+     currentPath = currentPath.replace(/^\//, '');
+     
+     // Find all nav links
+     $('.nav-link').each(function() {
+         var linkHref = $(this).attr('href');
+         
+         if (linkHref) {
+             // Remove base URL if present
+             if (linkHref.indexOf(baseUrl) === 0) {
+                 linkHref = linkHref.substring(baseUrl.length);
+             }
+             
+             // Remove leading slash
+             linkHref = linkHref.replace(/^\//, '');
+             
+             // Check if current path matches or starts with link path
+             if (currentPath === linkHref || currentPath.indexOf(linkHref) === 0) {
+                 // Add active class to the link
+                 $(this).addClass('active');
+                 
+                 // If it's inside a treeview, open the parent menu
+                 var parentMenu = $(this).closest('.nav-treeview').parent('.nav-item');
+                 if (parentMenu.length) {
+                     parentMenu.addClass('menu-open');
+                     parentMenu.find('> .nav-link').addClass('active');
+                 }
+             }
+         }
+     });
+     
+     // Special handling for dashboard
+     if (currentPath === 'admin/dashboard' || currentPath === 'admin' || currentPath === '') {
+         $('a[href*="admin/dashboard"]').addClass('active');
+     }
+ });
+ </script>
+ 
  <?= $this->renderSection('scripts') ?>
 </body>
 </html>

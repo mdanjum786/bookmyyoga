@@ -9,22 +9,58 @@ class TrainerController extends BaseController
 {
     public function index()
     {
-        //
-         $database = \Config\Database::connect();
+        $database = \Config\Database::connect();
+        
+        // Get filter parameters
+        $status = $this->request->getVar('status');
+        $search = $this->request->getVar('search');
+        
         $db = $database->table('trainers_and_studio');
-        $trainers_and_studio = $db->select('trainers_and_studio.*, admins.name as user_name, admins.username, admins.email as user_email') // Select columns from both tables
-             ->join('admins', 'admins.id = trainers_and_studio.user_id') // Join condition
-             ->orderBy('trainers_and_studio.id', 'DESC') // Order by event ID in descending order
-             ->get()
-             ->getResultArray();
+        $db->select('trainers_and_studio.*, admins.name as user_name, admins.username, admins.email as user_email');
+        $db->join('admins', 'admins.id = trainers_and_studio.user_id');
+        
+        // Apply status filter
+        if($status !== null && $status !== '') {
+            $db->where('trainers_and_studio.status', $status);
+        }
+        
+        // Apply search filter
+        if($search && !empty(trim($search))) {
+            $searchTerm = trim($search);
+            $db->groupStart();
+            $db->like('trainers_and_studio.business_name', $searchTerm);
+            $db->orLike('trainers_and_studio.email', $searchTerm);
+            $db->orLike('trainers_and_studio.mobile_no', $searchTerm);
+            $db->orLike('trainers_and_studio.address', $searchTerm);
+            $db->orLike('admins.name', $searchTerm);
+            $db->orLike('admins.email', $searchTerm);
+            $db->orLike('admins.username', $searchTerm);
+            $db->groupEnd();
+        }
+        
+        $db->orderBy('trainers_and_studio.id', 'DESC');
+        $trainers_and_studio = $db->get()->getResultArray();
+        
+        // Get statistics
+        $totalTrainers = $database->table('trainers_and_studio')->countAllResults();
+        $activeTrainers = $database->table('trainers_and_studio')->where('status', 1)->countAllResults();
+        $inactiveTrainers = $database->table('trainers_and_studio')->where('status', 0)->countAllResults();
+        
+        // Get filtered statistics if filters are applied
+        $filteredTotal = count($trainers_and_studio);
+        $filteredActive = count(array_filter($trainers_and_studio, function($t) { return $t['status'] == 1; }));
+        $filteredInactive = count(array_filter($trainers_and_studio, function($t) { return $t['status'] == 0; }));
+        
         $data['trainers_and_studio'] = $trainers_and_studio;
-        // echo "<pre>";
-        // print_r($data);
-        // echo "</pre>";
-        // die;
-        // $db = $database->table('services');
-        // $services = $db->orderBy('id', 'DESC')->get()->getResultArray();
-        // $data['services'] = $services;
+        $data['status_filter'] = $status;
+        $data['search_filter'] = $search;
+        $data['total_trainers'] = $totalTrainers;
+        $data['active_trainers'] = $activeTrainers;
+        $data['inactive_trainers'] = $inactiveTrainers;
+        $data['filtered_total'] = $filteredTotal;
+        $data['filtered_active'] = $filteredActive;
+        $data['filtered_inactive'] = $filteredInactive;
+        
         return view('admin/trainer-studio/index', $data);
     }
 
